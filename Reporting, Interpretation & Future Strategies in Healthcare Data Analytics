@@ -1,0 +1,747 @@
+# ============================================================
+# YUVA INTERN - WEEK 5 FINAL PROJECT
+# Healthcare Data Analytics
+# Reporting, Interpretation & Future Strategies
+# ============================================================
+
+import os
+import warnings
+warnings.filterwarnings("ignore")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report,
+    RocCurveDisplay
+)
+
+# ============================================================
+# 1. SETTINGS
+# ============================================================
+
+DATA_FILE = "cleaned_healthcare_data.csv"
+OUTPUT_FOLDER = "week5_results"
+
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+print("=" * 70)
+print("YUVA INTERN - WEEK 5")
+print("FINAL HEALTHCARE DATA ANALYTICS PROJECT")
+print("=" * 70)
+
+
+# ============================================================
+# 2. LOAD DATA
+# ============================================================
+
+try:
+    df = pd.read_csv(DATA_FILE)
+except FileNotFoundError:
+    print("\nERROR: cleaned_healthcare_data.csv not found.")
+    print("Put the CSV file in the same folder as this Python file.")
+    raise SystemExit
+
+print("\nDataset loaded successfully!")
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nFirst 5 Rows:")
+print(df.head())
+
+
+# ============================================================
+# 3. BASIC DATA INFORMATION
+# ============================================================
+
+print("\n" + "=" * 70)
+print("DATA INFORMATION")
+print("=" * 70)
+
+print(df.info())
+
+print("\nMissing Values:")
+print(df.isnull().sum().sort_values(ascending=False).head(15))
+
+print("\nDuplicate Rows:")
+print(df.duplicated().sum())
+
+
+# ============================================================
+# 4. CREATE TARGET VARIABLE
+# ============================================================
+
+# If original readmitted column exists, create target
+if "readmission_30_days" not in df.columns:
+
+    if "readmitted" in df.columns:
+
+        df["readmission_30_days"] = (
+            df["readmitted"].astype(str).str.strip() == "<30"
+        ).astype(int)
+
+        print("\nTarget variable created successfully.")
+
+    else:
+        print(
+            "\nERROR: Neither 'readmission_30_days' "
+            "nor 'readmitted' column exists."
+        )
+        raise SystemExit
+
+
+# ============================================================
+# 5. TARGET ANALYSIS
+# ============================================================
+
+print("\n" + "=" * 70)
+print("TARGET ANALYSIS")
+print("=" * 70)
+
+print(
+    df["readmission_30_days"]
+    .value_counts()
+)
+
+print("\nTarget Percentage:")
+
+print(
+    df["readmission_30_days"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .round(2)
+)
+
+
+# ============================================================
+# 6. TARGET VISUALIZATION
+# ============================================================
+
+plt.figure(figsize=(7, 5))
+
+sns.countplot(
+    x="readmission_30_days",
+    data=df
+)
+
+plt.title("30-Day Hospital Readmission Distribution")
+plt.xlabel("Readmission within 30 Days")
+plt.ylabel("Number of Patients")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "readmission_distribution.png"
+    ),
+    dpi=150
+)
+
+plt.show()
+
+
+# ============================================================
+# 7. REMOVE IDENTIFIER COLUMNS
+# ============================================================
+
+columns_to_remove = [
+    "encounter_id",
+    "patient_nbr"
+]
+
+for column in columns_to_remove:
+
+    if column in df.columns:
+        df.drop(
+            columns=[column],
+            inplace=True
+        )
+
+
+# ============================================================
+# 8. REMOVE ORIGINAL TARGET COLUMN
+# ============================================================
+
+if "readmitted" in df.columns:
+
+    df.drop(
+        columns=["readmitted"],
+        inplace=True
+    )
+
+
+# ============================================================
+# 9. DEFINE X AND Y
+# ============================================================
+
+TARGET = "readmission_30_days"
+
+X = df.drop(
+    columns=[TARGET]
+)
+
+y = df[TARGET].astype(int)
+
+
+# ============================================================
+# 10. IDENTIFY DATA TYPES
+# ============================================================
+
+numeric_features = X.select_dtypes(
+    include=["int64", "float64"]
+).columns.tolist()
+
+categorical_features = X.select_dtypes(
+    include=["object", "category", "bool"]
+).columns.tolist()
+
+print("\nNumerical Features:")
+print(numeric_features)
+
+print("\nCategorical Features:")
+print(categorical_features)
+
+
+# ============================================================
+# 11. TRAIN TEST SPLIT
+# ============================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+
+    X,
+    y,
+
+    test_size=0.20,
+
+    random_state=42,
+
+    stratify=y
+)
+
+print("\nTraining Samples:", len(X_train))
+print("Testing Samples :", len(X_test))
+
+
+# ============================================================
+# 12. PREPROCESSING
+# ============================================================
+
+numeric_pipeline = Pipeline([
+
+    (
+        "imputer",
+        SimpleImputer(
+            strategy="median"
+        )
+    ),
+
+    (
+        "scaler",
+        StandardScaler()
+    )
+])
+
+
+categorical_pipeline = Pipeline([
+
+    (
+        "imputer",
+        SimpleImputer(
+            strategy="most_frequent"
+        )
+    ),
+
+    (
+        "encoder",
+        OneHotEncoder(
+            handle_unknown="ignore"
+        )
+    )
+])
+
+
+preprocessor = ColumnTransformer([
+
+    (
+        "numeric",
+        numeric_pipeline,
+        numeric_features
+    ),
+
+    (
+        "categorical",
+        categorical_pipeline,
+        categorical_features
+    )
+])
+
+
+# ============================================================
+# 13. MACHINE LEARNING MODELS
+# ============================================================
+
+models = {
+
+    "Logistic Regression":
+        LogisticRegression(
+            max_iter=1000,
+            class_weight="balanced",
+            random_state=42
+        ),
+
+    "Decision Tree":
+        DecisionTreeClassifier(
+            max_depth=8,
+            min_samples_split=10,
+            class_weight="balanced",
+            random_state=42
+        ),
+
+    "Random Forest":
+        RandomForestClassifier(
+            n_estimators=150,
+            max_depth=12,
+            min_samples_split=5,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1
+        )
+}
+
+
+# ============================================================
+# 14. TRAIN MODELS
+# ============================================================
+
+results = {}
+
+trained_models = {}
+
+predictions = {}
+
+probabilities = {}
+
+
+for name, model in models.items():
+
+    print("\n" + "=" * 70)
+    print("TRAINING:", name)
+    print("=" * 70)
+
+    pipeline = Pipeline([
+
+        (
+            "preprocessing",
+            preprocessor
+        ),
+
+        (
+            "model",
+            model
+        )
+    ])
+
+    pipeline.fit(
+        X_train,
+        y_train
+    )
+
+    y_pred = pipeline.predict(
+        X_test
+    )
+
+    y_prob = pipeline.predict_proba(
+        X_test
+    )[:, 1]
+
+
+    accuracy = accuracy_score(
+        y_test,
+        y_pred
+    )
+
+    precision = precision_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    recall = recall_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    f1 = f1_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    roc_auc = roc_auc_score(
+        y_test,
+        y_prob
+    )
+
+
+    results[name] = {
+
+        "Accuracy": accuracy,
+
+        "Precision": precision,
+
+        "Recall": recall,
+
+        "F1 Score": f1,
+
+        "ROC-AUC": roc_auc
+    }
+
+
+    trained_models[name] = pipeline
+
+    predictions[name] = y_pred
+
+    probabilities[name] = y_prob
+
+
+    print("\nAccuracy :", round(accuracy, 4))
+    print("Precision:", round(precision, 4))
+    print("Recall   :", round(recall, 4))
+    print("F1 Score :", round(f1, 4))
+    print("ROC-AUC  :", round(roc_auc, 4))
+
+    print("\nClassification Report:")
+
+    print(
+        classification_report(
+            y_test,
+            y_pred,
+            zero_division=0
+        )
+    )
+
+
+# ============================================================
+# 15. MODEL COMPARISON
+# ============================================================
+
+results_df = pd.DataFrame(
+    results
+).T.reset_index()
+
+results_df.rename(
+    columns={
+        "index": "Model"
+    },
+    inplace=True
+)
+
+print("\n" + "=" * 70)
+print("MODEL COMPARISON")
+print("=" * 70)
+
+print(
+    results_df.round(4).to_string(
+        index=False
+    )
+)
+
+
+results_df.to_csv(
+
+    os.path.join(
+        OUTPUT_FOLDER,
+        "model_comparison.csv"
+    ),
+
+    index=False
+)
+
+
+# ============================================================
+# 16. SELECT BEST MODEL
+# ============================================================
+
+best_model_name = (
+
+    results_df
+    .sort_values(
+        "ROC-AUC",
+        ascending=False
+    )
+    .iloc[0]["Model"]
+)
+
+best_model = trained_models[
+    best_model_name
+]
+
+best_prediction = predictions[
+    best_model_name
+]
+
+best_probability = probabilities[
+    best_model_name
+]
+
+
+print("\n" + "=" * 70)
+
+print(
+    "BEST MODEL:",
+    best_model_name
+)
+
+print("=" * 70)
+
+
+# ============================================================
+# 17. CONFUSION MATRIX
+# ============================================================
+
+cm = confusion_matrix(
+    y_test,
+    best_prediction
+)
+
+print("\nConfusion Matrix:")
+print(cm)
+
+
+plt.figure(figsize=(7, 5))
+
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=[
+        "No Readmission",
+        "Readmitted"
+    ],
+    yticklabels=[
+        "No Readmission",
+        "Readmitted"
+    ]
+)
+
+plt.title(
+    f"Confusion Matrix - {best_model_name}"
+)
+
+plt.xlabel("Predicted")
+
+plt.ylabel("Actual")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "confusion_matrix.png"
+    ),
+    dpi=150
+)
+
+plt.show()
+
+
+# ============================================================
+# 18. ROC CURVE COMPARISON
+# ============================================================
+
+plt.figure(figsize=(8, 6))
+
+for name in trained_models:
+
+    RocCurveDisplay.from_predictions(
+
+        y_test,
+
+        probabilities[name],
+
+        name=name
+    )
+
+
+plt.title(
+    "ROC Curve Comparison"
+)
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "roc_curve_comparison.png"
+    ),
+    dpi=150
+)
+
+plt.show()
+
+
+# ============================================================
+# 19. RANDOM FOREST FEATURE IMPORTANCE
+# ============================================================
+
+if "Random Forest" in trained_models:
+
+    rf_pipeline = trained_models[
+        "Random Forest"
+    ]
+
+    rf_model = rf_pipeline.named_steps[
+        "model"
+    ]
+
+    rf_preprocessor = rf_pipeline.named_steps[
+        "preprocessing"
+    ]
+
+    feature_names = (
+
+        rf_preprocessor
+        .get_feature_names_out()
+    )
+
+    importance = rf_model.feature_importances_
+
+
+    feature_df = pd.DataFrame({
+
+        "Feature": feature_names,
+
+        "Importance": importance
+
+    })
+
+
+    feature_df = (
+
+        feature_df
+        .sort_values(
+            "Importance",
+            ascending=False
+        )
+        .head(15)
+    )
+
+
+    print(
+        "\nTop 15 Important Features:"
+    )
+
+    print(
+        feature_df.to_string(
+            index=False
+        )
+    )
+
+
+    feature_df.to_csv(
+
+        os.path.join(
+            OUTPUT_FOLDER,
+            "feature_importance.csv"
+        ),
+
+        index=False
+    )
+
+
+    plt.figure(
+        figsize=(9, 6)
+    )
+
+
+    sns.barplot(
+
+        data=feature_df,
+
+        x="Importance",
+
+        y="Feature"
+    )
+
+
+    plt.title(
+        "Top 15 Random Forest Features"
+    )
+
+    plt.tight_layout()
+
+
+    plt.savefig(
+
+        os.path.join(
+            OUTPUT_FOLDER,
+            "feature_importance.png"
+        ),
+
+        dpi=150
+    )
+
+
+    plt.show()
+
+
+# ============================================================
+# 20. SAVE CLEANED DATA
+# ============================================================
+
+df.to_csv(
+
+    os.path.join(
+        OUTPUT_FOLDER,
+        "final_healthcare_dataset.csv"
+    ),
+
+    index=False
+)
+
+
+# ============================================================
+# 21. FINAL PROJECT SUMMARY
+# ============================================================
+
+print("\n" + "=" * 70)
+print("WEEK 5 PROJECT COMPLETED SUCCESSFULLY")
+print("=" * 70)
+
+print("\nBest Model:", best_model_name)
+
+print("\nGenerated Files:")
+
+print("✓ model_comparison.csv")
+print("✓ confusion_matrix.png")
+print("✓ roc_curve_comparison.png")
+print("✓ feature_importance.csv")
+print("✓ feature_importance.png")
+print("✓ final_healthcare_dataset.csv")
+
+print("\nAll files are available inside:")
+print(OUTPUT_FOLDER)
+
+print("\nThank you!")
