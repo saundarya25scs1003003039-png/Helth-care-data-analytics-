@@ -1,0 +1,435 @@
+# ============================================================
+# YUVA INTERN - WEEK 3
+# Exploratory Data Analysis & Visualization in Virtual Healthcare
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ------------------------------------------------------------
+# 1. LOAD CLEANED HEALTHCARE DATA
+# ------------------------------------------------------------
+
+file_name = "cleaned_healthcare_data.csv"
+
+df = pd.read_csv(file_name)
+
+print("=" * 60)
+print("VIRTUAL HEALTHCARE DATA ANALYTICS")
+print("WEEK 3: EDA & VISUALIZATION")
+print("=" * 60)
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nFirst 5 Records:")
+print(df.head())
+
+# ------------------------------------------------------------
+# 2. DATA INFORMATION
+# ------------------------------------------------------------
+
+print("\n===== DATA INFORMATION =====")
+
+print(df.info())
+
+print("\n===== DATA TYPES =====")
+print(df.dtypes)
+
+# ------------------------------------------------------------
+# 3. MISSING VALUE CHECK
+# ------------------------------------------------------------
+
+print("\n===== MISSING VALUES =====")
+
+missing = df.isnull().sum()
+
+print(missing[missing > 0])
+
+# ------------------------------------------------------------
+# 4. DESCRIPTIVE STATISTICS
+# ------------------------------------------------------------
+
+print("\n===== DESCRIPTIVE STATISTICS =====")
+
+print(df.describe())
+
+# Save statistics
+df.describe().to_csv(
+    "descriptive_statistics.csv"
+)
+
+# ------------------------------------------------------------
+# 5. TARGET DISTRIBUTION
+# ------------------------------------------------------------
+
+if "readmission_30_days" in df.columns:
+
+    print("\n===== READMISSION DISTRIBUTION =====")
+
+    print(
+        df["readmission_30_days"]
+        .value_counts()
+    )
+
+    print("\nReadmission Percentage:")
+
+    print(
+        df["readmission_30_days"]
+        .value_counts(normalize=True) * 100
+    )
+
+# ------------------------------------------------------------
+# 6. HISTOGRAM
+# Hospital Stay Distribution
+# ------------------------------------------------------------
+
+if "time_in_hospital" in df.columns:
+
+    plt.figure(figsize=(8, 5))
+
+    sns.histplot(
+        data=df,
+        x="time_in_hospital",
+        bins=15,
+        kde=True
+    )
+
+    plt.title(
+        "Distribution of Hospital Stay"
+    )
+
+    plt.xlabel(
+        "Time in Hospital (Days)"
+    )
+
+    plt.ylabel(
+        "Number of Patients"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "hospital_stay_histogram.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 7. READMISSION COUNT PLOT
+# ------------------------------------------------------------
+
+if "readmission_30_days" in df.columns:
+
+    plt.figure(figsize=(7, 5))
+
+    sns.countplot(
+        data=df,
+        x="readmission_30_days"
+    )
+
+    plt.title(
+        "30-Day Hospital Readmission Distribution"
+    )
+
+    plt.xlabel(
+        "Readmission (0 = No, 1 = Yes)"
+    )
+
+    plt.ylabel(
+        "Number of Patients"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "readmission_distribution.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 8. READMISSION BY AGE
+# ------------------------------------------------------------
+
+if (
+    "age" in df.columns
+    and "readmission_30_days" in df.columns
+):
+
+    plt.figure(figsize=(10, 5))
+
+    sns.countplot(
+        data=df,
+        x="age",
+        hue="readmission_30_days"
+    )
+
+    plt.title(
+        "Hospital Readmission by Age Group"
+    )
+
+    plt.xlabel(
+        "Age Group"
+    )
+
+    plt.ylabel(
+        "Number of Patients"
+    )
+
+    plt.xticks(rotation=45)
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "readmission_by_age.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 9. BOX PLOT
+# Hospital Stay vs Readmission
+# ------------------------------------------------------------
+
+if (
+    "time_in_hospital" in df.columns
+    and "readmission_30_days" in df.columns
+):
+
+    plt.figure(figsize=(7, 5))
+
+    sns.boxplot(
+        data=df,
+        x="readmission_30_days",
+        y="time_in_hospital"
+    )
+
+    plt.title(
+        "Hospital Stay by 30-Day Readmission"
+    )
+
+    plt.xlabel(
+        "Readmission (0 = No, 1 = Yes)"
+    )
+
+    plt.ylabel(
+        "Time in Hospital (Days)"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "hospital_stay_vs_readmission.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 10. SCATTER PLOT
+# Medications vs Laboratory Procedures
+# ------------------------------------------------------------
+
+if (
+    "num_medications" in df.columns
+    and "num_lab_procedures" in df.columns
+):
+
+    plt.figure(figsize=(8, 6))
+
+    sns.scatterplot(
+        data=df,
+        x="num_medications",
+        y="num_lab_procedures",
+        hue="readmission_30_days"
+        if "readmission_30_days" in df.columns
+        else None,
+        alpha=0.5
+    )
+
+    plt.title(
+        "Medications vs Laboratory Procedures"
+    )
+
+    plt.xlabel(
+        "Number of Medications"
+    )
+
+    plt.ylabel(
+        "Number of Laboratory Procedures"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "medications_vs_lab_procedures.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 11. CORRELATION ANALYSIS
+# ------------------------------------------------------------
+
+numeric_df = df.select_dtypes(
+    include=np.number
+)
+
+correlation = numeric_df.corr()
+
+print("\n===== CORRELATION MATRIX =====")
+
+print(
+    correlation.round(2)
+)
+
+correlation.to_csv(
+    "correlation_matrix.csv"
+)
+
+# ------------------------------------------------------------
+# 12. CORRELATION HEATMAP
+# ------------------------------------------------------------
+
+plt.figure(figsize=(12, 8))
+
+sns.heatmap(
+    correlation,
+    annot=True,
+    fmt=".2f",
+    cmap="coolwarm",
+    center=0
+)
+
+plt.title(
+    "Healthcare Dataset Correlation Heatmap"
+)
+
+plt.tight_layout()
+
+plt.savefig(
+    "correlation_heatmap.png",
+    dpi=150
+)
+
+plt.show()
+
+# ------------------------------------------------------------
+# 13. PREVIOUS INPATIENT VISITS VS READMISSION
+# ------------------------------------------------------------
+
+if (
+    "number_inpatient" in df.columns
+    and "readmission_30_days" in df.columns
+):
+
+    plt.figure(figsize=(8, 5))
+
+    sns.boxplot(
+        data=df,
+        x="readmission_30_days",
+        y="number_inpatient"
+    )
+
+    plt.title(
+        "Previous Inpatient Visits vs Readmission"
+    )
+
+    plt.xlabel(
+        "Readmission (0 = No, 1 = Yes)"
+    )
+
+    plt.ylabel(
+        "Number of Previous Inpatient Visits"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "previous_inpatient_vs_readmission.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 14. MEDICATION DISTRIBUTION
+# ------------------------------------------------------------
+
+if "num_medications" in df.columns:
+
+    plt.figure(figsize=(8, 5))
+
+    sns.histplot(
+        data=df,
+        x="num_medications",
+        bins=20,
+        kde=True
+    )
+
+    plt.title(
+        "Distribution of Number of Medications"
+    )
+
+    plt.xlabel(
+        "Number of Medications"
+    )
+
+    plt.ylabel(
+        "Number of Patients"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "medication_distribution.png",
+        dpi=150
+    )
+
+    plt.show()
+
+# ------------------------------------------------------------
+# 15. TOP CORRELATIONS
+# ------------------------------------------------------------
+
+if "readmission_30_days" in correlation.columns:
+
+    target_corr = (
+        correlation["readmission_30_days"]
+        .drop("readmission_30_days")
+        .sort_values(
+            key=abs,
+            ascending=False
+        )
+    )
+
+    print(
+        "\n===== VARIABLES MOST RELATED TO READMISSION ====="
+    )
+
+    print(
+        target_corr.head(10)
+    )
+
+# ------------------------------------------------------------
+# 16. FINAL SUMMARY
+# ------------------------------------------------------------
+
+print("\n" + "=" * 60)
+print("EDA ANALYSIS COMPLETED SUCCESSFULLY")
+print("=" * 60)
+
+print("\nGenerated Files:")
+
+print("1. descriptive_statistics.csv")
+print("2. correlation_matrix.csv")
+print("3. hospital_stay_histogram.png")
+print("4. readmission_distribution.png")
+print("
