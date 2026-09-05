@@ -1,0 +1,293 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ==========================================
+# VIRTUAL HEALTHCARE DATA ANALYTICS
+# Week 2: Data Extraction & Cleaning
+# ==========================================
+
+# 1. Load Dataset
+file_name = "diabetic_data.csv"
+
+df = pd.read_csv(file_name)
+
+print("===== DATASET LOADED =====")
+print("Rows:", df.shape[0])
+print("Columns:", df.shape[1])
+
+print("\nFirst 5 Records:")
+print(df.head())
+
+# ==========================================
+# 2. Data Information
+# ==========================================
+
+print("\n===== DATA INFORMATION =====")
+df.info()
+
+print("\n===== MISSING VALUES =====")
+print(df.isnull().sum().sort_values(ascending=False).head(20))
+
+# ==========================================
+# 3. Replace Missing Value Symbols
+# ==========================================
+
+df = df.replace("?", np.nan)
+
+print("\nMissing values after replacing '?':")
+print(df.isnull().sum().sort_values(ascending=False).head(20))
+
+# ==========================================
+# 4. Standardize Column Names
+# ==========================================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.lower()
+    .str.replace(" ", "_")
+)
+
+print("\n===== STANDARDIZED COLUMNS =====")
+print(df.columns.tolist())
+
+# ==========================================
+# 5. Remove Unnecessary Columns
+# ==========================================
+
+columns_to_remove = [
+    "encounter_id",
+    "patient_nbr",
+    "weight",
+    "payer_code",
+    "medical_specialty"
+]
+
+for column in columns_to_remove:
+    if column in df.columns:
+        df.drop(column, axis=1, inplace=True)
+
+print("\nColumns after removal:")
+print(df.shape)
+
+# ==========================================
+# 6. Convert Numeric Columns
+# ==========================================
+
+numeric_columns = [
+    "admission_type_id",
+    "discharge_disposition_id",
+    "admission_source_id",
+    "time_in_hospital",
+    "num_lab_procedures",
+    "num_procedures",
+    "num_medications",
+    "number_outpatient",
+    "number_emergency",
+    "number_inpatient",
+    "number_diagnoses"
+]
+
+for column in numeric_columns:
+    if column in df.columns:
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce"
+        )
+
+# ==========================================
+# 7. Handle Missing Values
+# ==========================================
+
+# Numerical columns → median
+for column in df.select_dtypes(
+    include=np.number
+).columns:
+
+    df[column] = df[column].fillna(
+        df[column].median()
+    )
+
+# Categorical columns → Unknown
+for column in df.select_dtypes(
+    include="object"
+).columns:
+
+    df[column] = df[column].fillna("Unknown")
+
+print("\n===== MISSING VALUES AFTER CLEANING =====")
+print(df.isnull().sum().sum())
+
+# ==========================================
+# 8. Remove Duplicate Records
+# ==========================================
+
+duplicate_count = df.duplicated().sum()
+
+print("\nDuplicate records:", duplicate_count)
+
+df.drop_duplicates(inplace=True)
+
+print(
+    "Rows after removing duplicates:",
+    df.shape[0]
+)
+
+# ==========================================
+# 9. Create Target Variable
+# ==========================================
+
+if "readmitted" in df.columns:
+
+    df["readmission_30_days"] = (
+        df["readmitted"] == "<30"
+    ).astype(int)
+
+    df.drop(
+        "readmitted",
+        axis=1,
+        inplace=True
+    )
+
+print("\n===== TARGET DISTRIBUTION =====")
+
+if "readmission_30_days" in df.columns:
+    print(
+        df["readmission_30_days"]
+        .value_counts()
+    )
+
+# ==========================================
+# 10. Validate Data
+# ==========================================
+
+print("\n===== DATA VALIDATION =====")
+
+if "time_in_hospital" in df.columns:
+
+    negative_values = (
+        df["time_in_hospital"] < 0
+    ).sum()
+
+    print(
+        "Negative hospital stay values:",
+        negative_values
+    )
+
+if "number_diagnoses" in df.columns:
+
+    negative_values = (
+        df["number_diagnoses"] < 0
+    ).sum()
+
+    print(
+        "Negative diagnosis values:",
+        negative_values
+    )
+
+print("\nFinal Dataset Shape:")
+print(df.shape)
+
+# ==========================================
+# 11. Save Clean Dataset
+# ==========================================
+
+output_file = "cleaned_healthcare_data.csv"
+
+df.to_csv(
+    output_file,
+    index=False
+)
+
+print(
+    "\nCleaned dataset saved as:",
+    output_file
+)
+
+# ==========================================
+# 12. Visualization
+# ==========================================
+
+if "readmission_30_days" in df.columns:
+
+    plt.figure(figsize=(7, 5))
+
+    sns.countplot(
+        data=df,
+        x="readmission_30_days"
+    )
+
+    plt.title(
+        "30-Day Hospital Readmission Distribution"
+    )
+
+    plt.xlabel(
+        "Readmission (0 = No, 1 = Yes)"
+    )
+
+    plt.ylabel(
+        "Number of Patients"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "readmission_distribution.png"
+    )
+
+    plt.show()
+
+# ==========================================
+# 13. Hospital Stay Distribution
+# ==========================================
+
+if "time_in_hospital" in df.columns:
+
+    plt.figure(figsize=(8, 5))
+
+    sns.histplot(
+        data=df,
+        x="time_in_hospital",
+        bins=15
+    )
+
+    plt.title(
+        "Hospital Stay Distribution"
+    )
+
+    plt.xlabel(
+        "Time in Hospital (Days)"
+    )
+
+    plt.ylabel(
+        "Number of Patients"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "hospital_stay_distribution.png"
+    )
+
+    plt.show()
+
+# ==========================================
+# 14. Final Summary
+# ==========================================
+
+print("\n================================")
+print("DATA CLEANING COMPLETED")
+print("================================")
+
+print("Final Rows:", df.shape[0])
+print("Final Columns:", df.shape[1])
+
+print("\nOutput Files:")
+print("1. cleaned_healthcare_data.csv")
+print("2. readmission_distribution.png")
+print("3. hospital_stay_distribution.png")
+
+print("\nHealthcare data is ready for")
+print("further analysis and machine learning.")
